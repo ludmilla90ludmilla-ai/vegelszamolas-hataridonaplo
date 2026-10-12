@@ -1,0 +1,1348 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Végelszámolás-segédlet</title>
+<meta name="description" content="Ügyenkénti határidő- és teendőnapló a végelszámoláshoz, könyvelőknek – a hatályos jogszabályok és a NAV 60. füzet alapján.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Montserrat:wght@400;600;700&family=Piazzolla:wght@400;700&display=swap&subset=latin-ext" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+/* ============================================================
+   Alapstílus – semleges tokenekre épül. Az alapértékek a viktoriawp.eu
+   arculatéi; egy másik arculat az arculat/<név>/arculat.css-ben írja felül
+   a tokeneket (és csak ott a formát, ahol muszáj).
+   ============================================================ */
+:root {
+  --kiemeles: #02023B;        /* az egyetlen kiemelőszín */
+  --kiemeles-sotet: #02023B;
+  --kiemeles-szoveg: #FFFFFF;
+  --cim: #011111;
+  --szoveg: #62636A;
+  --hatter: #FFFFFF;
+  --felulet: #F0F0FF;
+  --keret: #DBDBDF;
+  --lab-hatter: #02023B;
+
+  --betu-cim: "Playfair Display", Georgia, serif;
+  --betu-szoveg: "Montserrat", "Helvetica Neue", Arial, sans-serif;
+  --betu-kiemelt: "Piazzolla", Georgia, serif;
+  --cim-suly: 400;
+  --gomb-atalakitas: uppercase;
+  --gomb-betu: 700 13px/1 var(--betu-szoveg);
+
+  --kerekites-kartya: 20px;
+  --kerekites-gomb: 6px;
+  --kontener: 1260px;
+  --oldalter: 20px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--hatter);
+  color: var(--szoveg);
+  font: 400 16px/1.6 var(--betu-szoveg);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { font-family: var(--betu-cim); font-weight: var(--cim-suly); color: var(--cim); margin: 0 0 .5em; }
+h1 { font-size: 46px; line-height: 1.2; }
+h2 { font-size: 30px; line-height: 1.25; }
+h3 { font-size: 21px; line-height: 1.3; }
+p { margin: 0 0 1em; }
+a { color: var(--kiemeles); }
+::selection { background: var(--kiemeles); color: var(--kiemeles-szoveg); }
+:focus-visible { outline: 2px solid var(--kiemeles); outline-offset: 2px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.kontener { max-width: var(--kontener); margin-inline: auto; padding-inline: var(--oldalter); }
+.csak-nyomtatas { display: none; }
+
+/* ---------- Fejléc ---------- */
+.fej { position: sticky; top: 0; z-index: 20; background: var(--hatter); box-shadow: 0 5px 10px rgba(0,0,0,.1); }
+.fej__belso {
+  max-width: var(--kontener); margin-inline: auto; padding: 12px var(--oldalter);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.logo { font-family: var(--betu-cim); font-size: 24px; color: var(--cim); line-height: 1.2; }
+.logo small { display: block; font: 600 12px/1.4 var(--betu-szoveg); letter-spacing: .08em; text-transform: uppercase; color: var(--szoveg); }
+.logo img { display: block; height: 48px; width: auto; }
+.fej__muveletek { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- Gombok ---------- */
+.gomb {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px 20px; border: 2px solid var(--kiemeles); border-radius: var(--kerekites-gomb);
+  background: var(--kiemeles); color: var(--kiemeles-szoveg);
+  font: var(--gomb-betu); text-transform: var(--gomb-atalakitas); letter-spacing: .02em;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.gomb:hover { background: var(--kiemeles-sotet); border-color: var(--kiemeles-sotet); }
+.gomb--korvonal { background: transparent; color: var(--kiemeles); }
+.gomb--korvonal:hover { background: var(--kiemeles); color: var(--kiemeles-szoveg); }
+.gomb--kicsi { padding: 10px 14px; }
+.gomb--szoveg {
+  background: none; border: 0; padding: 8px 0; margin-top: 18px; color: var(--szoveg);
+  font: 400 14px/1.4 var(--betu-szoveg); text-transform: none; text-decoration: underline; cursor: pointer;
+}
+.gomb--szoveg:hover { background: none; color: var(--kiemeles); }
+
+/* ---------- Bevezető ---------- */
+.bevezeto { padding: 48px 0 24px; max-width: 820px; }
+.szemoldok { display: block; font: 700 18px/1.3 var(--betu-kiemelt); color: var(--kiemeles); margin-bottom: .4em; }
+
+/* ---------- Rács ---------- */
+.racs { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 40px; align-items: start; padding-bottom: 64px; }
+.urlap { position: sticky; top: 96px; max-height: calc(100vh - 112px); overflow-y: auto; }
+
+/* ---------- Űrlap ---------- */
+.doboz { background: var(--felulet); border-radius: var(--kerekites-kartya); padding: 24px; }
+.doboz__cim { font-size: 24px; margin: 22px 0 14px; }
+.cimke { display: block; margin: 14px 0 6px; font-size: 14px; font-weight: 600; color: var(--cim); }
+.mezo {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--keret); border-radius: var(--kerekites-gomb);
+  background: #fff; color: var(--cim); font-size: 15px;
+}
+.mezo:focus { outline: none; border-color: var(--kiemeles); }
+.mezo[aria-invalid="true"] { border-color: var(--kiemeles); border-width: 2px; }
+.sugo { display: block; font-size: 13px; line-height: 1.4; margin-top: 4px; }
+.sor { display: flex; gap: 8px; }
+.sor .mezo { flex: 1; min-width: 0; }
+fieldset { border: 0; padding: 0; margin: 0; }
+.valaszto label, .jellemzok label { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--cim); padding: 4px 0; cursor: pointer; }
+.valaszto input, .jellemzok input, .szuro input { accent-color: var(--kiemeles); width: 18px; height: 18px; margin: 3px 0 0; flex: none; }
+.jellemzok label.tiltott { opacity: .45; cursor: default; }
+
+/* ---------- Figyelmeztetés ---------- */
+.figy { border-radius: var(--kerekites-kartya); padding: 16px 20px; margin-bottom: 12px; background: var(--felulet); color: var(--cim); border-left: 6px solid var(--keret); }
+.figy--hiba { border-left-color: var(--kiemeles); }
+.figy strong { display: block; margin-bottom: 2px; }
+.figy p { margin: 0; font-size: 15px; }
+
+/* ---------- Összesítő ---------- */
+.osszesito { background: var(--kiemeles); color: var(--kiemeles-szoveg); border-radius: var(--kerekites-kartya); padding: 24px 28px; margin-bottom: 20px; }
+.osszesito h2 { color: var(--kiemeles-szoveg); font-size: 24px; margin-bottom: 12px; }
+.osszesito__szamok { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-bottom: 16px; font-size: 15px; }
+.osszesito__szamok b { font-size: 26px; display: block; line-height: 1.1; }
+.osszesito ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.osszesito li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; font-size: 15px; }
+.osszesito li a { color: var(--kiemeles-szoveg); }
+.osszesito .ures { margin: 0; }
+
+.szuro { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 8px 0 8px; font-size: 14px; }
+.szuro label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+
+/* ---------- Ütemterv ---------- */
+.szakasz { margin-top: 36px; }
+.szakasz > h2 { font-size: 28px; padding-bottom: 8px; border-bottom: 1px solid var(--keret); }
+.kartya {
+  display: grid; grid-template-columns: 158px minmax(0, 1fr); gap: 18px;
+  padding: 20px 0; border-bottom: 1px solid var(--keret);
+}
+.kartya:last-child { border-bottom: 0; }
+.datum { text-align: left; }
+.datum__nap { display: block; font: 700 17px/1.3 var(--betu-szoveg); color: var(--cim); }
+.datum__het { display: block; font-size: 13px; }
+.jelveny {
+  display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: var(--kerekites-gomb);
+  font: 700 12px/1.4 var(--betu-szoveg);
+  border: 1.5px solid var(--kiemeles); color: var(--kiemeles); background: transparent;
+}
+.jelveny--teli { background: var(--kiemeles); color: var(--kiemeles-szoveg); }
+.jelveny--halvany { border-color: var(--keret); color: var(--szoveg); }
+.kartya__fej { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.kartya h3 { font-size: 20px; margin-bottom: 4px; }
+.kartya__meta { font-size: 14px; margin-bottom: 8px; }
+.kartya__meta b { color: var(--cim); font-weight: 600; }
+.kartya__leiras { margin-bottom: 8px; }
+.kartya__megj { font-size: 14px; margin: 0 0 8px; padding-left: 12px; border-left: 3px solid var(--keret); }
+.forrasok { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.forrasok a { text-decoration: underline; text-underline-offset: 2px; }
+.kesz { display: flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 600; color: var(--cim); white-space: nowrap; cursor: pointer; }
+.kesz input { accent-color: var(--kiemeles); width: 20px; height: 20px; margin: 0; }
+.kartya--kesz .datum, .kartya--kesz h3, .kartya--kesz .kartya__leiras { opacity: .5; }
+.kartya--kesz .datum__nap { text-decoration: line-through; }
+.kartya--lejart .datum__nap { color: var(--kiemeles); }
+.jegyzet summary { font-size: 13px; cursor: pointer; color: var(--szoveg); margin-top: 6px; }
+.jegyzet textarea { width: 100%; min-height: 60px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--keret); border-radius: var(--kerekites-gomb); font-size: 14px; }
+.ures-allapot { background: var(--felulet); border-radius: var(--kerekites-kartya); padding: 28px; }
+
+/* ---------- Lábléc ---------- */
+.lab { background: var(--lab-hatter); color: #fff; padding: 48px 0 40px; font-size: 14px; }
+.lab h3 { color: #fff; font-size: 19px; }
+.lab a { color: #fff; }
+.lab__oszlopok { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 32px; }
+.lab__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+
+/* ---------- Mobil ---------- */
+@media (max-width: 1023px) {
+  .racs { grid-template-columns: 1fr; gap: 28px; }
+  .urlap { position: static; max-height: none; overflow: visible; }
+}
+@media (max-width: 767px) {
+  :root { --oldalter: 16px; }
+  h1 { font-size: 30px; }
+  h2 { font-size: 24px; }
+  .bevezeto { padding-top: 28px; }
+  .fej { position: static; }
+  .fej__muveletek .gomb { padding: 9px 12px; }
+  .osszesito { padding: 20px; }
+  .osszesito__szamok { gap: 8px 16px; }
+  .osszesito__szamok span { flex: 1 1 0; min-width: 84px; font-size: 13px; line-height: 1.3; }
+  .kartya { grid-template-columns: 1fr; gap: 8px; }
+  .kartya__fej { flex-direction: column; gap: 6px; }
+  .osszesito li { grid-template-columns: 1fr; gap: 0; }
+  .szakasz > h2 { font-size: 22px; }
+  .logo img { height: 40px; }
+}
+
+/* ---------- Nyomtatás ---------- */
+@media print {
+  .fej, .urlap, .szuro, .jegyzet summary, .lab, .bevezeto p { display: none !important; }
+  .csak-nyomtatas { display: block; }
+  .racs { display: block; }
+  body { font-size: 11pt; }
+  .osszesito { background: none; color: #000; border: 1px solid #999; }
+  .osszesito h2, .osszesito li a { color: #000; }
+  .kartya { break-inside: avoid; }
+  .jegyzet { display: block; }
+  .jegyzet textarea { border: 0; padding: 0; min-height: 0; }
+  a { color: #000; }
+}
+
+</style>
+<style>
+/* viktoriawp.eu – az alapstílus tokenjei már ennek az arculatnak az értékei
+   (viktoriawp-stilus skill). Itt csak a finomhangolás van. */
+.logo a { color: inherit; text-decoration: none; }
+.lab__iroda { margin-top: 12px; }
+
+</style>
+</head>
+<body>
+
+<header class="fej">
+  <div class="fej__belso">
+    <div class="logo"><a href="https://viktoriawp.eu/">Tamás Viktória<small>Végelszámolás-segédlet</small></a></div>
+    <nav class="fej__muveletek" aria-label="Műveletek">
+      <button type="button" class="gomb gomb--korvonal" data-muvelet="ics">Naptárba (.ics)</button>
+      <button type="button" class="gomb gomb--korvonal" data-muvelet="nyomtat">Nyomtatás</button>
+      <button type="button" class="gomb gomb--korvonal" data-muvelet="ment">Mentés fájlba</button>
+      <label class="gomb gomb--korvonal">Betöltés<input type="file" accept="application/json,.json" id="betolt" hidden></label>
+    </nav>
+  </div>
+</header>
+
+<main class="kontener">
+  <section class="bevezeto">
+    <span class="szemoldok">Segédlet könyvelőknek</span>
+    <h1>Végelszámolási határidőnapló</h1>
+    <p>Add meg a cég adatait és a kezdőnapot: a segédlet kiszámolja a határidőket, és a teendőket kipipálhatod. Az adatok csak ebben a böngészőben maradnak; fájlba mentve máshol is visszatölthetők.</p>
+  </section>
+
+  <div class="racs">
+    <aside class="urlap" aria-label="Az ügy adatai">
+      <div class="doboz">
+        <div class="ugyvalaszto">
+          <label for="ugy" class="cimke">Mentett ügy</label>
+          <div class="sor">
+            <select id="ugy" class="mezo"></select>
+            <button type="button" class="gomb gomb--kicsi" data-muvelet="uj">Új ügy</button>
+          </div>
+        </div>
+
+        <h2 class="doboz__cim">Az ügy adatai</h2>
+
+        <label class="cimke" for="ceg">Cégnév</label>
+        <input class="mezo" id="ceg" name="ceg" type="text" autocomplete="off" placeholder="pl. Minta Kft. v.a.">
+
+        <fieldset class="valaszto">
+          <legend class="cimke">Eljárás</legend>
+          <label><input type="radio" name="eljaras" value="alt"> Általános végelszámolás</label>
+          <label><input type="radio" name="eljaras" value="egy"> Egyszerűsített végelszámolás</label>
+        </fieldset>
+
+        <div id="datummezok"></div>
+
+        <fieldset class="jellemzok">
+          <legend class="cimke">Jellemzők</legend>
+          <div id="jellemzomezok"></div>
+        </fieldset>
+
+        <button type="button" class="gomb gomb--szoveg" data-muvelet="torol">Az ügy törlése ebből a böngészőből</button>
+      </div>
+    </aside>
+
+    <section class="eredmeny" aria-live="polite">
+      <div id="nyomtatasfej" class="csak-nyomtatas"></div>
+      <div id="figyelmeztetesek"></div>
+      <div id="osszesito"></div>
+      <div class="szuro">
+        <label><input type="checkbox" id="keszRejt"> Kész tételek elrejtése</label>
+        <label><input type="checkbox" id="infoRejt"> Csak a dátumos tételek</label>
+      </div>
+      <div id="utemterv"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="lab">
+  <div class="kontener">
+    <div class="lab__oszlopok">
+      <div>
+        <h3>Források</h3>
+        <ul id="forraslista" class="lab__lista"></ul>
+      </div>
+      <div>
+        <h3>A határidők számítása</h3>
+        <p>A napokban megadott határidőbe nem számít bele az okot adó nap (Air. 52. § (1)). Az adóhatóság felé a munkaszüneti napra eső határidő a következő munkanapon jár le (Air. 52. § (4)); ezeket a segédlet eltolja. A cégbírósági és a számviteli határidőket nem tolja el, csak jelzi, ha munkaszüneti napra esnek.</p>
+        <p>Munkaszüneti napok: Mt. 102. § (1), valamint az évenkénti munkarendi rendelet (<span id="munkarendek"></span>).</p>
+      </div>
+      <div>
+        <h3>Állapot</h3>
+        <p>A szabályok a <span id="allapot"></span>-i hatályos jogszabályszöveg és a NAV 60. füzet 2026. május 14-i változata alapján készültek. A segédlet a jogszabályt nem helyettesíti.</p>
+        <p class="lab__iroda">A legfrissebb változat: <a href="https://ludmilla90ludmilla-ai.github.io/vegelszamolas-hataridonaplo/" target="_blank" rel="noopener">online</a> · <a href="https://ludmilla90ludmilla-ai.github.io/vegelszamolas-hataridonaplo/vegelszamolas-segedlet.zip">letöltés (.zip)</a></p>
+<p class="lab__iroda">Tamás Viktória · <a href="https://viktoriawp.eu/">viktoriawp.eu</a></p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   Határidő-számítás (a tényösszesítő 0. pontja szerint)
+   - Air. 52. § (1): a napokban megadott határidőbe nem számít bele az okot adó nap.
+   - Air. 52. § (2): a hónapokban/években megadott határidő a számánál fogva megfelelő
+     napon jár le; ha az hiányzik, a hónap utolsó napján.
+   - Air. 52. § (4): az adóhatóság felé a munkaszüneti napon lejáró határidő a következő
+     munkanapon jár le. Más (cégbírósági, számviteli) határidőt NEM tolunk el, csak jelzünk.
+   - Munkaszüneti napok: Mt. 102. § (1); évenkénti eltérések: NGM-rendelet.
+   Minden dátum 'ÉÉÉÉ-HH-NN' szöveg, a számolás UTC-ben történik (nincs időzóna-csúszás).
+   ============================================================ */
+(function (global) {
+  "use strict";
+
+  // Évenkénti munkarend – csak kihirdetett rendeletből!
+  const MUNKAREND = {
+    2026: {
+      forras: "10/2025. (IV. 30.) NGM rendelet",
+      url: "https://njt.hu/jogszabaly/2025-10-20-2X",
+      pihenonap: ["2026-01-02", "2026-08-21", "2026-12-24"],
+      munkanap: ["2026-01-10", "2026-08-08", "2026-12-12"]
+    }
+  };
+
+  const MS_NAP = 86400000;
+
+  function parse(s) {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const [y, m, d] = s.split("-").map(Number);
+    const t = Date.UTC(y, m - 1, d);
+    const dt = new Date(t);
+    // Érvénytelen naptári dátum (pl. 02-31) kiszűrése
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+    return dt;
+  }
+
+  function fmt(dt) {
+    return dt.toISOString().slice(0, 10);
+  }
+
+  function napHozzaad(s, n) {
+    const dt = parse(s);
+    return dt ? fmt(new Date(dt.getTime() + n * MS_NAP)) : null;
+  }
+
+  function honapUtolsoNapja(y, m0) {
+    return new Date(Date.UTC(y, m0 + 1, 0)).getUTCDate();
+  }
+
+  // Air. 52. § (2)
+  function honapHozzaad(s, n) {
+    const dt = parse(s);
+    if (!dt) return null;
+    const y0 = dt.getUTCFullYear(), m0 = dt.getUTCMonth() + n;
+    const y = y0 + Math.floor(m0 / 12), m = ((m0 % 12) + 12) % 12;
+    const d = Math.min(dt.getUTCDate(), honapUtolsoNapja(y, m));
+    return fmt(new Date(Date.UTC(y, m, d)));
+  }
+
+  function evHozzaad(s, n) {
+    return honapHozzaad(s, 12 * n);
+  }
+
+  // „a fordulónapot követő ötödik hónap utolsó napja” (Kr. 5. § (6), 6. § (4))
+  function kovetoHonapUtolsoNapja(s, n) {
+    const dt = parse(s);
+    if (!dt) return null;
+    const m0 = dt.getUTCMonth() + n;
+    const y = dt.getUTCFullYear() + Math.floor(m0 / 12), m = ((m0 % 12) + 12) % 12;
+    return fmt(new Date(Date.UTC(y, m, honapUtolsoNapja(y, m))));
+  }
+
+  function napKulonbseg(a, b) {
+    const da = parse(a), db = parse(b);
+    return da && db ? Math.round((db - da) / MS_NAP) : null;
+  }
+
+  // Húsvétvasárnap (Meeus/Jones/Butcher, Gergely-naptár)
+  function husvet(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+    const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const ho = Math.floor((h + l - 7 * m + 114) / 31), nap = ((h + l - 7 * m + 114) % 31) + 1;
+    return fmt(new Date(Date.UTC(y, ho - 1, nap)));
+  }
+
+  const unnepCache = {};
+  // Mt. 102. § (1)
+  function munkaszunetiNapok(y) {
+    if (unnepCache[y]) return unnepCache[y];
+    const hv = husvet(y);
+    const p = (md) => `${y}-${md}`;
+    const lista = {};
+    lista[p("01-01")] = "újév";
+    lista[p("03-15")] = "nemzeti ünnep";
+    lista[napHozzaad(hv, -2)] = "nagypéntek";
+    lista[napHozzaad(hv, 1)] = "húsvéthétfő";
+    lista[p("05-01")] = "a munka ünnepe";
+    lista[napHozzaad(hv, 50)] = "pünkösdhétfő";
+    lista[p("08-20")] = "nemzeti ünnep";
+    lista[p("10-23")] = "nemzeti ünnep";
+    lista[p("11-01")] = "mindenszentek";
+    lista[p("12-25")] = "karácsony";
+    lista[p("12-26")] = "karácsony";
+    return (unnepCache[y] = lista);
+  }
+
+  function vanMunkarend(y) {
+    return Object.prototype.hasOwnProperty.call(MUNKAREND, y);
+  }
+
+  // Miért nem munkanap? null = munkanap.
+  function nemMunkanapOka(s) {
+    const dt = parse(s);
+    if (!dt) return null;
+    const y = dt.getUTCFullYear();
+    const mr = MUNKAREND[y];
+    if (mr && mr.munkanap.includes(s)) return null;               // áthelyezett munkanap
+    const unnep = munkaszunetiNapok(y)[s];
+    if (unnep) return `munkaszüneti nap (${unnep})`;
+    if (mr && mr.pihenonap.includes(s)) return "áthelyezett pihenőnap";
+    const wd = dt.getUTCDay();
+    if (wd === 6) return "szombat";
+    if (wd === 0) return "vasárnap";
+    return null;
+  }
+
+  // Air. 52. § (4): a következő munkanap
+  function kovetkezoMunkanap(s) {
+    let d = s, n = 0;
+    while (nemMunkanapOka(d) && n < 15) { d = napHozzaad(d, 1); n++; }
+    return d;
+  }
+
+  /*
+   * Egy határidő kiszámítása.
+   * szabaly: { nap?: n, honap?: n, ev?: n, honapVege?: n }  – a kiinduló dátumhoz képest
+   * nav: true → Air. 52. § (4) eltolás
+   * Visszaad: { datum, eredeti, eltolva, nemMunkanap, munkarendHianyzik }
+   */
+  function szamol(alapDatum, szabaly, nav) {
+    if (!parse(alapDatum)) return null;
+    let d;
+    if (szabaly.honapVege != null) d = kovetoHonapUtolsoNapja(alapDatum, szabaly.honapVege);
+    else if (szabaly.ev != null) d = evHozzaad(alapDatum, szabaly.ev);
+    else if (szabaly.honap != null) d = honapHozzaad(alapDatum, szabaly.honap);
+    else d = napHozzaad(alapDatum, szabaly.nap || 0);
+    const ok = nemMunkanapOka(d);
+    const ev = parse(d).getUTCFullYear();
+    const eredmeny = { datum: d, eredeti: d, eltolva: false, nemMunkanap: ok, munkarendHianyzik: !vanMunkarend(ev) };
+    if (nav && ok) {
+      eredmeny.datum = kovetkezoMunkanap(d);
+      eredmeny.eltolva = true;
+      eredmeny.munkarendHianyzik = !vanMunkarend(parse(eredmeny.datum).getUTCFullYear()) || eredmeny.munkarendHianyzik;
+    }
+    return eredmeny;
+  }
+
+  const HONAPOK = ["január", "február", "március", "április", "május", "június", "július",
+    "augusztus", "szeptember", "október", "november", "december"];
+  const NAPOK = ["vasárnap", "hétfő", "kedd", "szerda", "csütörtök", "péntek", "szombat"];
+
+  function magyarDatum(s, napNevvel) {
+    const dt = parse(s);
+    if (!dt) return "";
+    const t = `${dt.getUTCFullYear()}. ${HONAPOK[dt.getUTCMonth()]} ${dt.getUTCDate()}.`;
+    return napNevvel ? `${t} (${NAPOK[dt.getUTCDay()]})` : t;
+  }
+
+  function maISO() {
+    const n = new Date();
+    return fmt(new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())));
+  }
+
+  global.Hatarido = {
+    MUNKAREND, parse, fmt, napHozzaad, honapHozzaad, evHozzaad, kovetoHonapUtolsoNapja,
+    napKulonbseg, husvet, munkaszunetiNapok, vanMunkarend, nemMunkanapOka, kovetkezoMunkanap,
+    szamol, magyarDatum, maISO
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ============================================================
+   Szabálytár – CSAK a tenyosszesito.md ✅ tételei kerülhetnek ide.
+   Minden tétel azonosítója a tényösszesítő sorszáma.
+   Állapot: 2026-10-12 (njt.hu hatályos szöveg; NAV 60. füzet, 2026.05.14.)
+
+   Mezők:
+     id        – a tényösszesítő sorszáma
+     eljaras   – ["alt"] általános, ["egy"] egyszerűsített, vagy mindkettő
+     szakasz   – a SZAKASZOK kulcsa
+     cim, leiras
+     felelos   – { alt, egy } vagy szöveg
+     alap      – a kiinduló dátum kulcsa (ALAPOK), ha van határidő
+     szabaly   – { nap | honap | ev | honapVege } (lásd hataridok.js)
+     nav       – true: az adóhatóság felé (Air. 52. § (4) eltolás)
+     hatarido  – a határidő szöveges leírása (mindig megjelenik)
+     tipus     – "hatarido" | "esemeny" | "info"
+     feltetel  – jellemző-kulcs (JELLEMZOK), ha csak akkor releváns
+     forras    – [[forráskulcs, hely], ...]
+   ============================================================ */
+(function (global) {
+  "use strict";
+
+  const FORRASOK = {
+    ctv:   { rov: "Ctv.",       nev: "2006. évi V. törvény",                    url: "https://njt.hu/jogszabaly/2006-5-00-00" },
+    art:   { rov: "Art.",       nev: "2017. évi CL. törvény",                   url: "https://njt.hu/jogszabaly/2017-150-00-00" },
+    air:   { rov: "Air.",       nev: "2017. évi CLI. törvény",                  url: "https://njt.hu/jogszabaly/2017-151-00-00" },
+    vhr:   { rov: "465/2017. Korm. r.", nev: "465/2017. (XII. 28.) Korm. rendelet", url: "https://njt.hu/jogszabaly/2017-465-20-22" },
+    kr:    { rov: "72/2006. Korm. r.",  nev: "72/2006. (IV. 3.) Korm. rendelet",   url: "https://njt.hu/jogszabaly/2006-72-20-22" },
+    szt:   { rov: "Számv. tv.", nev: "2000. évi C. törvény",                    url: "https://njt.hu/jogszabaly/2000-100-00-00" },
+    mt:    { rov: "Mt.",        nev: "2012. évi I. törvény",                    url: "https://njt.hu/jogszabaly/2012-1-00-00" },
+    nav60: { rov: "NAV 60. füzet", nev: "A végelszámolási eljárás tudnivalói (2026.05.14.)",
+             url: "https://nav.gov.hu/pfile/file?path=/ugyfeliranytu/nezzen-utana/inf_fuz/2026/60.-A-vegelszamolasi-eljaras-tudnivaloi-2026.05.14" }
+  };
+
+  const SZAKASZOK = [
+    { kulcs: "elhatarozas", cim: "Elhatározás és bejelentés" },
+    { kulcs: "kezdes",      cim: "A kezdőnapot követő 30 nap" },
+    { kulcs: "hitelezok",   cim: "Közzététel és hitelezők" },
+    { kulcs: "szamvitel",   cim: "Számvitel a végelszámolás alatt" },
+    { kulcs: "adozas",      cim: "Adózás a végelszámolás alatt" },
+    { kulcs: "befejezes",   cim: "Befejezés és törlés" },
+    { kulcs: "tovabb",      cim: "Ha a cég mégis tovább működik" }
+  ];
+
+  // A felhasználó által megadható dátumok (a kezdőnapon kívül mind opcionális)
+  const ALAPOK = {
+    dontes:      { cim: "A legfőbb szerv határozatának kelte" },
+    kezdonap:    { cim: "A végelszámolás kezdőnapja" },
+    kozzetetel:  { cim: "A Cégközlönyben való közzététel napja" },
+    hitelVege:   { cim: "A hitelezői igénybejelentés határidejének vége", szamitott: true },
+    nyito:       { cim: "A nyitó mérleg elkészítésének napja" },
+    zaroFordulo: { cim: "A lezáró beszámoló fordulónapja" },
+    atteresOk:   { cim: "Az áttérési ok bekövetkezése" }
+  };
+
+  const JELLEMZOK = {
+    konyvvizsgalat: "Könyvvizsgálatra kötelezett (Számv. tv. 155. §)",
+    kiva:           "KIVA-alany",
+    munkavallalo:   "Van munkavállaló",
+    meghatalmazas:  "A cég korábban meghatalmazást adott (pl. az irodának)",
+    azonos:         "A végelszámoló azonos a korábbi vezető tisztségviselővel",
+    tagiKolcson:    "Van tagi kölcsön",
+    tobbEv:         "Elhúzódhat 12 hónapon túl (évközi beszámolók)"
+  };
+
+  const VEGELSZ = { alt: "végelszámoló", egy: "vezető tisztségviselő" };
+  const KORABBI = { alt: "korábbi vezető tisztségviselő", egy: "vezető tisztségviselő" };
+
+  const TETELEK = [
+    /* ---------- Elhatározás ---------- */
+    {
+      id: "A1.1", eljaras: ["alt", "egy"], szakasz: "elhatarozas", tipus: "esemeny",
+      alap: "dontes", szabaly: { nap: 0 },
+      cim: "A legfőbb szerv határozata a jogutód nélküli megszűnésről",
+      leiras: "Rögzíti a kezdő időpontot (nem lehet korábbi a határozatnál), és dönt a részesedéssel működő jogalanyok, egyesületek, alapítványok sorsáról. Általános eljárásban a végelszámolót is megválasztja, a díjazásával vagy az ingyenességgel együtt. A létesítő okiratot nem kell módosítani.",
+      felelos: "legfőbb szerv", hatarido: "a határozat kelte",
+      forras: [["ctv", "97. § (2)"], ["ctv", "98. § (1)"], ["ctv", "99. § (2)"]]
+    },
+    {
+      id: "A1.2", eljaras: ["alt", "egy"], szakasz: "elhatarozas", tipus: "esemeny",
+      alap: "kezdonap", szabaly: { nap: 0 },
+      cim: "Kezdőnap: a képviselet átszáll",
+      leiras: "Általános eljárásban a vezető tisztségviselő megbízatása megszűnik, a céget a végelszámoló képviseli, ő teljesíti az adókötelezettségeket, és vele szemben szabják ki a mulasztási bírságot. Egyszerűsített eljárásban mindez a vezető tisztségviselőre hárul.",
+      felelos: VEGELSZ, hatarido: "kezdőnap",
+      forras: [["ctv", "98. § (2)"], ["ctv", "114. § (2)"], ["art", "12. § (1)–(2)"]]
+    },
+    {
+      id: "A1.3", eljaras: ["alt"], szakasz: "elhatarozas", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { nap: 30 },
+      cim: "Változásbejegyzési kérelem a cégbírósághoz",
+      leiras: "Tartalma: a határozat kelte, a kezdő időpont, a végelszámoló adatai, a korábbi vezető jogviszonyának megszűnése és a cégnév „v.a.” toldattal. Mellékletei: a határozat; a végelszámoló elfogadó és összeférhetetlenségi nyilatkozata; nyilatkozat arról, hogy az ügyvezetés tájékoztatta a munkavállalói érdekképviseletet. A kérelem a kezdőnap előtt is beadható, de nem a döntés napja előtt, és legfeljebb 30 nappal a kezdőnap előtt.",
+      felelos: "végelszámoló", hatarido: "kezdőnap + 30 nap",
+      forras: [["ctv", "101. § (1)"], ["ctv", "50. § (5)–(6)"], ["ctv", "1. sz. melléklet V. 1."]]
+    },
+    {
+      id: "A1.4", eljaras: ["alt"], szakasz: "elhatarozas", tipus: "esemeny",
+      alap: "kozzetetel", szabaly: { nap: 0 },
+      cim: "Közzététel a Cégközlönyben",
+      leiras: "A cégbíróság végzést hoz, és közzéteszi a végelszámolás megindítását, a hitelezőknek szóló felhívással együtt. A közzététel napját az ügy adatai között kell megadni: erre épül a hitelezői szakasz minden határideje.",
+      felelos: "cégbíróság", hatarido: "a cégbíróság intézkedése",
+      forras: [["ctv", "102. § (1)–(2)"]]
+    },
+    {
+      id: "B3", eljaras: ["egy"], szakasz: "elhatarozas", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { nap: 15 }, nav: true,
+      cim: "T201T adatlap a NAV-nak (megindítás)",
+      leiras: "Az egyszerűsített végelszámolás megindítását a NAV-nak kell bejelenteni, a cégbírósághoz nem. A NAV értesíti a cégbíróságot. A cégbíróság automatikusan bejegyzi a „v.a.” toldatot és a kezdőnapot, és a Cégközlönyben hitelezői felhívással együtt közzéteszi.",
+      felelos: "vezető tisztségviselő", hatarido: "kezdőnap + 15 nap",
+      forras: [["ctv", "114. § (3)–(4)"], ["art", "44. §"], ["vhr", "16. § (1) d)"], ["nav60", "8. old."]]
+    },
+    {
+      id: "B3k", eljaras: ["egy"], szakasz: "elhatarozas", tipus: "esemeny",
+      alap: "kozzetetel", szabaly: { nap: 0 },
+      cim: "Közzététel a Cégközlönyben (automatikus)",
+      leiras: "A NAV értesítése alapján a cégbíróság teszi közzé, hitelezői felhívással (40 nap). A közzététel napját az ügy adatai között kell megadni.",
+      felelos: "cégbíróság", hatarido: "a cégbíróság intézkedése",
+      forras: [["ctv", "114. § (4)"], ["ctv", "102. § (2) c)"]]
+    },
+    {
+      id: "A1.5", eljaras: ["alt"], szakasz: "elhatarozas", tipus: "info",
+      feltetel: "meghatalmazas", kiveve: "azonos",
+      cim: "Nyilatkozat a NAV-nak a korábbi meghatalmazásokról",
+      leiras: "A kezdőnap előtt adott meghatalmazás alapján a meghatalmazott (például az iroda) csak akkor járhat el, ha a végelszámoló nyilatkozott a NAV-nak a meghatalmazás érvényességéről. Nem kell nyilatkozni, ha a végelszámoló azonos a meghatalmazást adó korábbi képviselővel. Egyszerűsített eljárásban a meghatalmazások nyilatkozat nélkül érvényesek maradnak.",
+      felelos: "végelszámoló", hatarido: "a meghatalmazott első eljárása előtt",
+      forras: [["air", "15. § (7)"], ["nav60", "1. old."]]
+    },
+
+    /* ---------- A kezdőnapot követő 30 nap ---------- */
+    {
+      id: "A2.1", eljaras: ["alt", "egy"], szakasz: "kezdes", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { nap: 30 },
+      cim: "Tevékenységet lezáró beszámoló: elkészítés, elfogadás, átadás",
+      leiras: "A mérlegfordulónap a kezdőnapot megelőző nap ({{kezdonap-1}}). Az üzleti év az előző fordulónapot követő naptól tart eddig a napig. A beszámolót el kell fogadtatni, és legkésőbb a 30. napon át kell adni a végelszámolónak (könyvvizsgálati kötelezettség esetén a könyvvizsgálói jelentéssel együtt). Üzleti jelentés nem kell.",
+      felelos: KORABBI, hatarido: "kezdőnap + 30 nap",
+      forras: [["kr", "3. § (1)–(3)"], ["kr", "9. § (1)"], ["szt", "11. § (10)"]]
+    },
+    {
+      id: "A2.2", eljaras: ["alt", "egy"], szakasz: "kezdes", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { nap: 30 },
+      cim: "Tevékenységet lezáró beszámoló: letétbe helyezés, közzététel",
+      leiras: "Az adózott eredmény felhasználásáról szóló határozattal együtt (könyvvizsgálati kötelezettség esetén a könyvvizsgálói jelentéssel együtt). A NAV 60. füzet szerint ez nem vonatkozik az eva- és a kata-alanyokra.",
+      felelos: KORABBI, hatarido: "kezdőnap + 30 nap",
+      forras: [["kr", "3. § (4)"], ["nav60", "2. old."]]
+    },
+    {
+      id: "A2.3", eljaras: ["alt", "egy"], szakasz: "kezdes", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { nap: 30 }, nav: true,
+      cim: "Tevékenységet lezáró adóbevallások",
+      leiras: "Az időszak utolsó napja: {{kezdonap-1}}. Leggyakrabban ’71, ’65, ’08, ’01{{kiva}}. Ezekkel egyidejűleg kell benyújtani a korábbi időszakok még le nem járt határidejű bevallásait is. NY-nyilatkozat erre nem adható.",
+      felelos: KORABBI, hatarido: "kezdőnap + 30 nap (Air. 52. § (4) szerint eltolva)",
+      forras: [["art", "53. § (1)"], ["art", "49. § (4)"], ["nav60", "2. és 4. old."]]
+    },
+    {
+      id: "A2.4", eljaras: ["alt"], szakasz: "kezdes", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { nap: 30 },
+      cim: "Iratok átadása a végelszámolónak",
+      leiras: "A jogszabályban előírt feladatok elvégzése, valamint az okiratok és a cég iratanyagának átadása; tájékoztatás a folyamatban lévő ügyekről; iratjegyzék a nem selejtezhető és a titkos minősítésű iratokról, és ezek, valamint az irattári anyag átadása. Akkor is így kell eljárni, ha a végelszámoló maga a korábbi vezető. Mulasztás esetén kártérítési felelősség és 100 000–900 000 Ft-os, ismételten kiszabható bírság.",
+      felelos: "korábbi vezető tisztségviselő", hatarido: "legkésőbb a kezdőnaptól számított 30. napon",
+      forras: [["ctv", "98. § (3) a), c), d)"], ["ctv", "98. § (4)–(5)"]]
+    },
+    {
+      id: "A2.6", eljaras: ["alt"], szakasz: "kezdes", tipus: "info", feltetel: "munkavallalo",
+      alap: "kezdonap", szabaly: { nap: 0 },
+      cim: "A munkavállalók és az érdekképviseletek tájékoztatása",
+      leiras: "A munkavállalókat, a szakszervezeteket és az üzemi tanácsot (üzemi megbízottat) tájékoztatni kell a végelszámolás megindításáról. A változásbejegyzési kérelemhez nyilatkozat kell arról, hogy ez megtörtént.",
+      felelos: "korábbi vezető tisztségviselő", hatarido: "haladéktalanul",
+      forras: [["ctv", "98. § (3) e)"], ["ctv", "1. sz. melléklet V. 1. d)"]]
+    },
+
+    /* ---------- Közzététel és hitelezők ---------- */
+    {
+      id: "A3.1", eljaras: ["alt", "egy"], szakasz: "hitelezok", tipus: "hatarido",
+      alap: "kozzetetel", szabaly: { nap: 15 },
+      cim: "Értesítések a közzététel után",
+      leiras: "Szükség szerint: az ingatlanügyi hatóság; a közhiteles nyilvántartások (például jármű); a környezetvédelmi hatóság; minden számlavezető pénzforgalmi szolgáltató; a részesedéssel működő jogalanyok, egyesületek és alapítványok; a folyamatban lévő eljárások hatóságai és bíróságai.",
+      felelos: VEGELSZ, hatarido: "közzététel + 15 nap",
+      forras: [["ctv", "102. § (3)"], ["ctv", "114. § (5)"]]
+    },
+    {
+      id: "A3.2", eljaras: ["alt", "egy"], szakasz: "hitelezok", tipus: "esemeny",
+      alap: "kozzetetel", szabaly: { nap: 40 },
+      cim: "A hitelezői igénybejelentés határideje",
+      leiras: "A határidő elmulasztása nem jár jogvesztéssel. A zárómérleg és a vagyonfelosztási határozat elfogadása után azonban az igény már csak a megszűnt cég tartozásaiért való helytállás szabályai szerint érvényesíthető.",
+      felelos: "hitelezők", hatarido: "közzététel + 40 nap",
+      forras: [["ctv", "106. § (1)"]]
+    },
+    {
+      id: "A3.3", eljaras: ["alt", "egy"], szakasz: "hitelezok", tipus: "hatarido",
+      alap: "hitelVege", szabaly: { nap: 15 },
+      cim: "Követelésjegyzék",
+      leiras: "Külön kimutatva az elismert és a vitatott hitelezői igényeket. Egyszerűsített eljárásban ha egy igényt a cég vitat, át kell térni az általános eljárásra.",
+      felelos: VEGELSZ, hatarido: "a hitelezői határidő vége + 15 nap",
+      forras: [["ctv", "106. § (2)"], ["ctv", "115/A. § (1) a)"]]
+    },
+    {
+      id: "A3.4", eljaras: ["alt", "egy"], szakasz: "hitelezok", tipus: "hatarido",
+      alap: "hitelVege", szabaly: { nap: 45 },
+      cim: "A hitelezők értesítése a követelésük minősítéséről",
+      leiras: "Ha a végelszámoló egy követelést vitat, a hitelező az értesítés kézhezvételétől számított 30 napon belül perelhet. A vitatott igényekre lekötött tartalékot kell képezni.",
+      felelos: VEGELSZ, hatarido: "a hitelezői határidő vége + 45 nap",
+      forras: [["ctv", "106. § (2), (4)–(5)"], ["kr", "5. § (7)"]]
+    },
+    {
+      id: "A3.5", eljaras: ["alt", "egy"], szakasz: "hitelezok", tipus: "hatarido",
+      alap: "hitelVege", szabaly: { nap: 60 },
+      cim: "Válasz a hitelezők megkeresésére",
+      leiras: "Ha egy hitelező kéri, tájékoztatni kell arról, hogy a végelszámoló elismeri-e a követelését, és mikorra várható a kifizetés. Ha ez elmarad, végelszámolási kifogásnak van helye.",
+      felelos: VEGELSZ, hatarido: "a hitelezői határidő vége + 60 nap",
+      forras: [["ctv", "109. § (2)"]]
+    },
+
+    /* ---------- Számvitel ---------- */
+    {
+      id: "A4.1", eljaras: ["alt", "egy"], szakasz: "szamvitel", tipus: "info",
+      cim: "Végelszámolási nyitó mérleg",
+      leiras: "A kezdőnappal, a tevékenységet lezáró beszámoló mérlege és leltára alapján. A jogszabály nem ad rá határidőt. Az elkészítés napját az ügy adatai között érdemes megadni, mert erre épül a korrigált nyitó mérleg határideje.",
+      felelos: VEGELSZ, hatarido: "nincs jogszabályi határidő",
+      forras: [["kr", "4. § (1)–(2)"], ["kr", "9. § (1)"]]
+    },
+    {
+      id: "A4.2", eljaras: ["alt", "egy"], szakasz: "szamvitel", tipus: "hatarido",
+      alap: "nyito", szabaly: { nap: 75 },
+      cim: "Korrigált végelszámolási nyitó mérleg",
+      leiras: "A hitelezői igénybejelentések és a vagyonfelmérés alapján. Három oszlopban: eredeti adatok, eltérések, összevont adatok. Az eltérésekről tételes jegyzék kell. A legfőbb szerv elé kell terjeszteni.",
+      felelos: VEGELSZ, hatarido: "a nyitó mérleg elkészítése + legfeljebb 75 nap",
+      forras: [["kr", "4. § (3)–(8)"]]
+    },
+    {
+      id: "A4.3", eljaras: ["alt", "egy"], szakasz: "szamvitel", tipus: "info",
+      cim: "Ha a vagyon nem fedezi a tartozásokat",
+      leiras: "A tagokat fel kell hívni, hogy a hiányzó összeget 30 napon belül fizessék meg. Ha nem fizetnek, a végelszámoló haladéktalanul köteles felszámolást kérni; ehhez nem kell a legfőbb szerv hozzájárulása, de haladéktalanul tájékoztatnia kell.",
+      felelos: VEGELSZ, hatarido: "a tagok fizetési határideje 30 nap",
+      forras: [["ctv", "108. § (1)"], ["nav60", "3. old."]]
+    },
+    {
+      id: "A4.4", eljaras: ["alt"], szakasz: "szamvitel", tipus: "info",
+      cim: "Üzleti év a végelszámolás alatt",
+      leiras: "A végelszámolás időszaka általában egy üzleti év. Ha 12 hónap alatt nem fejeződik be, az üzleti évek 12 hónaposak (a kezdőnaptól számítva), az utolsó rövidebb is lehet. Az évközi beszámolók határidejét a segédlet kiszámolja, ha a „12 hónapon túl” jellemző be van jelölve.",
+      felelos: "végelszámoló", hatarido: "–",
+      forras: [["szt", "11. § (12)"], ["nav60", "4. old."]]
+    },
+    {
+      id: "A4.6", eljaras: ["alt"], szakasz: "szamvitel", tipus: "info",
+      cim: "Évenkénti tájékoztató a legfőbb szervnek",
+      leiras: "Csak ha a legfőbb szerv elrendelte. Be kell mutatnia a cég helyzetét, azt, hogy miért nem fejeződött még be az eljárás, és a befejezés várható időpontját.",
+      felelos: "végelszámoló", hatarido: "évente, ha elrendelték",
+      forras: [["ctv", "104. § (4)"]]
+    },
+
+    /* ---------- Adózás ---------- */
+    {
+      id: "A5.1", eljaras: ["alt", "egy"], szakasz: "adozas", tipus: "info",
+      cim: "Bevallások a végelszámolás alatt",
+      leiras: "A bevallások az általános szabályok szerint esedékesek, a végelszámolás tényét jelölni kell. Bevallást akkor is be kell adni, ha nincs adófizetési kötelezettség; ilyenkor NY-nyilatkozat is elég, kivéve a tevékenységet lezáró és a záró bevallást.",
+      felelos: VEGELSZ, hatarido: "az általános határidők",
+      forras: [["art", "53. § (1)"], ["art", "49. § (4)"], ["nav60", "4. old."]]
+    },
+    {
+      id: "A5.2", eljaras: ["alt", "egy"], szakasz: "adozas", tipus: "info",
+      cim: "Pénzforgalmi számla",
+      leiras: "A végelszámolás alatt is kell legalább egy, a NAV-hoz bejelentett pénzforgalmi számla. Enélkül a NAV nem tud kiutalni, postán sem. Ha nincs számla, a kiutalandó összegről és a jogosultjáról a vagyonfelosztási javaslatban kell rendelkezni.",
+      felelos: VEGELSZ, hatarido: "folyamatos",
+      forras: [["art", "114. §"], ["nav60", "12. old."]]
+    },
+    {
+      id: "A5.3", eljaras: ["alt", "egy"], szakasz: "adozas", tipus: "info",
+      cim: "Túlfizetés és visszaigénylés a törlés előtt",
+      leiras: "A túlfizetést és a visszaigényelhető adót (a megszűnéshez kapcsolódó áfát is) a törlés előtt kell visszaigényelni, a ’65 bevalláson vagy az ATVUT17 kérelemmel. A törlés után csak a vagyonfelosztási javaslat szerinti jogosult kérheti a kiutalást.",
+      felelos: VEGELSZ, hatarido: "a törlés előtt",
+      forras: [["nav60", "11–12. old."]]
+    },
+    {
+      id: "A5.4", eljaras: ["alt", "egy"], szakasz: "adozas", tipus: "info",
+      cim: "Adóellenőrzés",
+      leiras: "Kötelező az adóellenőrzés, ha a cég a végelszámolás elrendelésekor (egyszerűsített eljárásban a bejelentéskor) kockázatos adózónak minősül. Az adóellenőrzés jegyzőkönyvére 8 napon belül, a jogkövetési vizsgálatéra 15 napon belül lehet észrevételt tenni.",
+      felelos: VEGELSZ, hatarido: "–",
+      forras: [["air", "87. § (1) aa)"], ["art", "145. § (1)"], ["nav60", "11. old."]]
+    },
+
+    /* ---------- Befejezés ---------- */
+    {
+      id: "A6.1", eljaras: ["alt"], szakasz: "befejezes", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { ev: 3 },
+      cim: "A 3 éves határ: törlési kérelem",
+      leiras: "A végelszámolást a kezdőnaptól számított 3 éven belül be kell fejezni. Ha a törlési kérelem addig nem érkezik be, kényszertörlés indul. Ilyenkor a végelszámoló tisztsége megszűnik, de együttműködési kötelezettsége marad.",
+      felelos: "végelszámoló", hatarido: "kezdőnap + 3 év",
+      forras: [["ctv", "105. §"], ["ctv", "116. § (1) b)"]]
+    },
+    {
+      id: "B6", eljaras: ["egy"], szakasz: "befejezes", tipus: "hatarido",
+      alap: "kezdonap", szabaly: { nap: 150 },
+      cim: "A 150 napos határ: T201T a befejezésről + iratok a cégbíróságnak",
+      leiras: "A T201T adatlapot a NAV-nak, és ezzel egyidejűleg elektronikusan a cégbíróságnak a jóváhagyott vagyonfelosztási javaslatot és határozatot kell benyújtani. Ezek csak a jogszabályi iratmintával készíthetők (21/2006. IM r.; minták a szuf.magyarorszag.hu-n). A NAV 30 napon belül értesíti a cégbíróságot, ha a törlésnek nincs akadálya.",
+      felelos: "vezető tisztségviselő", hatarido: "kezdőnap + 150 nap",
+      forras: [["ctv", "114. § (1) b)"], ["ctv", "115. § (2)–(3)"], ["nav60", "8–9. old."]]
+    },
+    {
+      id: "A6.2", eljaras: ["alt", "egy"], szakasz: "befejezes", tipus: "info",
+      cim: "Mikor nem fejezhető be",
+      leiras: "Amíg hatósági vagy bírósági eljárás van folyamatban a céggel szemben, vagy amíg van olyan ismert követelés vagy tartozás, amelyről a vagyonfelosztási határozat nem rendelkezik.",
+      felelos: VEGELSZ, hatarido: "–",
+      forras: [["ctv", "95. § (4)"], ["ctv", "112. § (5)"]]
+    },
+    {
+      id: "A6.3", eljaras: ["alt", "egy"], szakasz: "befejezes", tipus: "info",
+      cim: "Lezáró beszámoló és vagyonfelosztási javaslat",
+      leiras: "A fordulónapot a végelszámoló határozza meg. Az eszközöket és a kötelezettségeket piaci értéken kell értékelni. Az elhatárolásokat, a céltartalékot és az értékelési tartalékot ki kell vezetni. A díjat, a költségeket és az iratőrzést kötelezettségként kell felvenni, a tulajdonosoknak kiadott eszközök áfáját is. A vagyonfelosztási javaslat eszközcsoportonként elkülönítve készül.",
+      felelos: VEGELSZ, hatarido: "a záró fordulónap a végelszámoló döntése",
+      forras: [["kr", "7. § (1)–(7)"], ["kr", "9. § (1)"]]
+    },
+    {
+      id: "A6.4", eljaras: ["alt", "egy"], szakasz: "befejezes", tipus: "info",
+      cim: "A legfőbb szerv jóváhagyása",
+      leiras: "A legfőbb szerv elé kell terjeszteni: az adóbevallásokat, a számviteli dokumentumokat, a vagyonfelosztási javaslatot (a díjjavaslattal) és a részesedéssel működő jogalanyok sorsáról szóló javaslatot. A határozat rendelkezhet engedményezésről, tartozásátvállalásról, a díjról, a költségek viseléséről és az iratőrzésről.",
+      felelos: VEGELSZ, hatarido: "a törlési kérelem előtt",
+      forras: [["ctv", "111. § (1)–(3)"], ["ctv", "112. § (1)"]]
+    },
+    {
+      id: "A6.5", eljaras: ["alt", "egy"], szakasz: "befejezes", tipus: "info",
+      cim: "Amivel a zárásnál számolni kell",
+      leiras: "Az ésszerű jövőbeni költségek; a vállalkozásból kivont jövedelem utáni szja, amelyet a cég a záró ’08 bevalláson vall be és fizet meg (a szochót a magánszemély fizeti); a fordulónapig várható, még elő nem írt késedelmi pótlék (a NAV pótlékszámító programjával).",
+      felelos: VEGELSZ, hatarido: "–",
+      forras: [["nav60", "5–6. old."]]
+    },
+    {
+      id: "A6.6", eljaras: ["alt", "egy"], szakasz: "befejezes", tipus: "info", feltetel: "tagiKolcson",
+      cim: "Tagi kölcsön rendezése",
+      leiras: "A tagi kölcsönt vissza kell fizetni vagy rendezni kell. Ha a vagyonfelosztási javaslatban elengedik, egyéb bevétel. Ha a végelszámolás a cég törlésével zárul, az elengedés illetékmentes; ha a törlés elmarad, az illetéket késedelmi pótlékkal kell megfizetni. Az illeték felfüggesztéséhez az AVBA adatlapot a záró bevallásokkal egyidejűleg kell benyújtani.",
+      felelos: VEGELSZ, hatarido: "az AVBA a záró bevallásokkal egyidejűleg",
+      forras: [["nav60", "6. old."]]
+    },
+    {
+      id: "A6.7", eljaras: ["alt"], szakasz: "befejezes", tipus: "hatarido",
+      alap: "zaroFordulo", szabaly: { nap: 60 },
+      cim: "Egyszerre: lezáró beszámoló, záró bevallások, törlési kérelem",
+      leiras: "(1) A lezáró beszámoló letétbe helyezése és közzététele, a még le nem járt korábbi beszámolókkal együtt. (2) A záró adóbevallások (’71, ’65, ’08, ’01; az időszak záró napja a befejezés napja) a közzétételre való megküldéssel egyidejűleg, a még le nem járt korábbi bevallásokkal együtt. (3) Az illetékmentes törlési kérelem a cégbírósághoz. Mellékletei: a határozatok, a beszámoló, a vagyonfelosztási javaslat és határozat, az engedményezési és tartozásátvállalási okiratok, valamint a végelszámoló nyilatkozata a tartozások kiegyenlítéséről.",
+      felelos: "végelszámoló", hatarido: "a záró fordulónap + 60 nap",
+      forras: [["kr", "7. § (6)–(6a)"], ["art", "53. § (1)"], ["ctv", "112. § (4)"], ["ctv", "2. sz. melléklet IV."], ["nav60", "7. old."]]
+    },
+    {
+      id: "B7", eljaras: ["egy"], szakasz: "befejezes", tipus: "hatarido",
+      alap: "zaroFordulo", szabaly: { nap: 60 },
+      cim: "Lezáró beszámoló és záró bevallások",
+      leiras: "A lezáró beszámoló letétbe helyezése és közzététele, és ezzel egyidejűleg a záró adóbevallások. A 150 napos határt (T201T a befejezésről) ettől függetlenül tartani kell.",
+      felelos: "vezető tisztségviselő", hatarido: "a záró fordulónap + 60 nap",
+      forras: [["kr", "9. § (1)"], ["kr", "7. § (6)"], ["art", "53. § (1)"]]
+    },
+    {
+      id: "A6.8", eljaras: ["alt", "egy"], szakasz: "befejezes", tipus: "info", feltetel: "munkavallalo",
+      cim: "Bérterhek bevallása, ha a munkaviszony a megszűnéssel szűnik meg",
+      leiras: "A záró bevallás és a jogutód nélküli megszűnés közötti időszak bérterheiről külön bevallás kell, és az adót is meg kell fizetni.",
+      felelos: VEGELSZ, hatarido: "a munkaviszony megszűnése + 30 nap",
+      forras: [["art", "53. § (2)"]]
+    },
+    {
+      id: "A6.9", eljaras: ["alt"], szakasz: "befejezes", tipus: "info",
+      cim: "Törlés és NAV-hozzájárulás",
+      leiras: "A cégbíróság akkor törli a céget, ha a NAV szerint nincs akadály, vagy ha a lezáró beszámoló közzétételétől számított 90 nap eltelt. Ha adóeljárás folyik vagy köztartozás van, a törlésre csak ezek rendezése után kerülhet sor.",
+      felelos: "cégbíróság, NAV", hatarido: "NAV: legfeljebb 90 nap",
+      forras: [["ctv", "62. § (4)"], ["nav60", "7. old."]]
+    },
+    {
+      id: "A6.10", eljaras: ["alt", "egy"], szakasz: "befejezes", tipus: "info",
+      cim: "A vagyon kiadása",
+      leiras: "A felosztott vagyon kiadása csak a cég törléséről szóló végzés meghozatala után kezdhető meg.",
+      felelos: VEGELSZ, hatarido: "a törlési végzés után",
+      forras: [["ctv", "112. § (3)"], ["kr", "8. § (2)"]]
+    },
+    {
+      id: "B8", eljaras: ["egy"], szakasz: "befejezes", tipus: "hatarido",
+      alap: "atteresOk", szabaly: { nap: 60 },
+      cim: "Áttérés az általános eljárásra",
+      leiras: "Kötelező, ha a cég egy hitelezői igényt vitat (vagy emiatt per indul), ha végelszámolási kifogás van folyamatban, vagy ha letelt a 150 nap. Ilyenkor végelszámolót kell választani, és változásbejegyzési kérelmet kell benyújtani. Az áttérési ok napját az ügy adatai között kell megadni; ha a 150 nap telik le, az a 150. nap.",
+      felelos: "legfőbb szerv, vezető tisztségviselő", hatarido: "az áttérési ok + 60 nap",
+      forras: [["ctv", "115/A. § (1)–(2)"], ["nav60", "9. old."]]
+    },
+    {
+      id: "B9", eljaras: ["egy"], szakasz: "befejezes", tipus: "esemeny",
+      alap: "kezdonap", szabaly: { nap: 211 },
+      cim: "211. nap: a cégbíróság lezárja az eljárást",
+      leiras: "Ha a cég nem fejezte be az eljárást, és nem tért át az általános szabályokra, a cégbíróság automatikusan bejegyzi a végelszámolás befejezését, és törli a „v.a.” toldatot. A cég nem szűnik meg.",
+      felelos: "cégbíróság", hatarido: "kezdőnap + 211 nap",
+      forras: [["ctv", "115/A. § (3)"], ["nav60", "9. old."]]
+    },
+
+    /* ---------- Továbbműködés ---------- */
+    {
+      id: "A7.1", eljaras: ["alt"], szakasz: "tovabb", tipus: "info",
+      cim: "A végelszámolás megszüntetése",
+      leiras: "A legfőbb szerv a törlési kérelem benyújtásáig dönthet a végelszámolás megszüntetéséről és a működés folytatásáról. Ilyenkor a végelszámoló visszahívásáról, díjáról és az új vezető tisztségviselőről is dönteni kell. Beszámoló a megszüntetés napjával mint fordulónappal; letétbe helyezés a fordulónapot követő 5. hónap utolsó napjáig. Záró bevallások (V3) is kellenek.",
+      felelos: "legfőbb szerv, végelszámoló", hatarido: "a törlési kérelem benyújtásáig",
+      forras: [["ctv", "113. §"], ["kr", "6. § (1), (4)"], ["nav60", "12. old."]]
+    },
+    {
+      id: "B10", eljaras: ["egy"], szakasz: "tovabb", tipus: "info",
+      cim: "Az egyszerűsített végelszámolás megszüntetése",
+      leiras: "Ha a legfőbb szerv a megszüntetésről és a működés folytatásáról dönt, a döntéstől számított 8 napon belül be kell jelenteni a NAV-nak (T201T). A NAV értesíti a cégbíróságot.",
+      felelos: "vezető tisztségviselő", hatarido: "a döntés + 8 nap",
+      forras: [["ctv", "115. § (1)"], ["nav60", "8. old."]]
+    }
+  ];
+
+  // Évközi beszámoló (Kr. 5. § (6)) – az app generálja fordulónaponként
+  const EVKOZI = {
+    id: "A4.5", eljaras: ["alt"], szakasz: "szamvitel", tipus: "hatarido",
+    cim: "Évközi beszámoló ({{fordulo}} fordulónappal)",
+    leiras: "A lezárt végelszámolási üzleti évről, „végelszámolás alatt” jelöléssel. Az első év beszámolója sajátos oszlopszerkezetű. Üzleti jelentés nem kell. Letétbe helyezés és közzététel.",
+    felelos: "végelszámoló", hatarido: "a fordulónapot követő 5. hónap utolsó napja",
+    szabaly: { honapVege: 5 },
+    forras: [["kr", "5. § (1)–(6)"], ["szt", "11. § (12)"]]
+  };
+
+  global.Szabalyok = { FORRASOK, SZAKASZOK, ALAPOK, JELLEMZOK, TETELEK, EVKOZI, ALLAPOT: "2026-10-12" };
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* ============================================================
+   Végelszámolás-segédlet – felület
+   Függ: hataridok.js (Hatarido), szabalyok.js (Szabalyok)
+   ============================================================ */
+(function () {
+  "use strict";
+  const H = window.Hatarido, S = window.Szabalyok;
+  const TAROLO = "vegelszamolas.ugyek.v1", AKTIV = "vegelszamolas.aktiv.v1", NEZET = "vegelszamolas.nezet.v1";
+  const KOZELI_NAP = 15;
+
+  // Teszteléshez: ?ma=2026-05-01
+  const MA = (() => {
+    const p = new URLSearchParams(location.search).get("ma");
+    return H.parse(p) ? p : H.maISO();
+  })();
+
+  const DATUMMEZOK = [
+    { k: "dontes",      cim: "A határozat kelte",                    eljaras: ["alt", "egy"] },
+    { k: "kezdonap",    cim: "A végelszámolás kezdőnapja",           eljaras: ["alt", "egy"], sugo: "Nem lehet korábbi a határozatnál." },
+    { k: "kozzetetel",  cim: "Cégközlöny-közzététel napja",          eljaras: ["alt", "egy"], sugo: "Ha már megjelent. Erre épülnek a hitelezői határidők." },
+    { k: "nyito",       cim: "A nyitó mérleg elkészítésének napja",  eljaras: ["alt", "egy"] },
+    { k: "zaroFordulo", cim: "A lezáró beszámoló fordulónapja",      eljaras: ["alt", "egy"], sugo: "Ha már tudod vagy tervezed." },
+    { k: "atteresOk",   cim: "Az áttérési ok napja",                 eljaras: ["egy"], sugo: "Vitatott igény vagy végelszámolási kifogás napja. Üresen a 150. nappal számol." }
+  ];
+
+  /* ---------- Segédek ---------- */
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const ujId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  function olvas(kulcs, alap) {
+    try { const v = localStorage.getItem(kulcs); return v ? JSON.parse(v) : alap; } catch (e) { return alap; }
+  }
+  function ir(kulcs, ertek) {
+    try { localStorage.setItem(kulcs, JSON.stringify(ertek)); } catch (e) { /* privát mód: csak a fájlmentés működik */ }
+  }
+
+  function uresUgy() {
+    return { id: ujId(), ceg: "", eljaras: "alt", datumok: {}, jell: {}, kesz: {}, jegyzet: {}, modositva: new Date().toISOString() };
+  }
+
+  function ervenyesit(u) {
+    if (!u || typeof u !== "object") return null;
+    const o = uresUgy();
+    o.id = typeof u.id === "string" ? u.id : o.id;
+    o.ceg = typeof u.ceg === "string" ? u.ceg.slice(0, 200) : "";
+    o.eljaras = u.eljaras === "egy" ? "egy" : "alt";
+    for (const m of DATUMMEZOK) if (u.datumok && H.parse(u.datumok[m.k])) o.datumok[m.k] = u.datumok[m.k];
+    for (const k of Object.keys(S.JELLEMZOK)) if (u.jell && u.jell[k] === true) o.jell[k] = true;
+    if (u.kesz && typeof u.kesz === "object") for (const [k, v] of Object.entries(u.kesz)) if (v === true) o.kesz[k] = true;
+    if (u.jegyzet && typeof u.jegyzet === "object") for (const [k, v] of Object.entries(u.jegyzet)) if (typeof v === "string" && v) o.jegyzet[k] = v.slice(0, 2000);
+    o.modositva = typeof u.modositva === "string" ? u.modositva : o.modositva;
+    return o;
+  }
+
+  /* ---------- Állapot ---------- */
+  let ugyek = olvas(TAROLO, {});
+  for (const k of Object.keys(ugyek)) { const v = ervenyesit(ugyek[k]); if (v) ugyek[k] = v; else delete ugyek[k]; }
+  let aktivId = olvas(AKTIV, null);
+  if (!ugyek[aktivId]) {
+    const elso = Object.keys(ugyek)[0];
+    if (elso) aktivId = elso; else { const u = uresUgy(); ugyek[u.id] = u; aktivId = u.id; }
+  }
+  const nezet = Object.assign({ keszRejt: false, infoRejt: false }, olvas(NEZET, {}));
+  const ugy = () => ugyek[aktivId];
+
+  function ment() {
+    ugy().modositva = new Date().toISOString();
+    ir(TAROLO, ugyek);
+    ir(AKTIV, aktivId);
+  }
+
+  /* ---------- Számítás ---------- */
+  function alapDatumok(u) {
+    const d = Object.assign({}, u.datumok);
+    if (d.kozzetetel) d.hitelVege = H.napHozzaad(d.kozzetetel, 40);
+    if (u.eljaras === "egy" && !d.atteresOk && d.kezdonap) { d.atteresOk = H.napHozzaad(d.kezdonap, 150); d._atteres150 = true; }
+    return d;
+  }
+
+  function behelyettesit(szoveg, u) {
+    const k = u.datumok.kezdonap;
+    // A magyar dátum ponttal zárul; ha mondatvégre kerül, nem kell még egy pont.
+    const datum = k ? H.magyarDatum(H.napHozzaad(k, -1)) : "a kezdőnapot megelőző nap";
+    return szoveg
+      .replace(/\{\{kezdonap-1\}\}(\.?)/, (_, pont) => datum + (pont && !datum.endsWith(".") ? "." : ""))
+      .replace("{{kiva}}", u.jell.kiva ? "; mivel a cég KIVA-alany, a ’71 helyett a KIVA bevallás" : "; KIVA-alanynál a ’71 helyett a KIVA bevallás");
+  }
+
+  function felelosSzoveg(f, eljaras) {
+    return typeof f === "string" ? f : f[eljaras];
+  }
+
+  function allapot(t, u) {
+    if (t.tipus === "info") return "info";
+    if (u.kesz[t.kulcs]) return "kesz";
+    if (!t.hatarido) return "fugg";
+    const kul = H.napKulonbseg(MA, t.hatarido.datum);
+    if (kul < 0) return t.tipus === "esemeny" ? "mult" : "lejart";
+    if (kul <= KOZELI_NAP) return "kozeli";
+    return "kesobbi";
+  }
+
+  function tetelek(u) {
+    const d = alapDatumok(u);
+    const lista = [];
+    for (const t of S.TETELEK) {
+      if (!t.eljaras.includes(u.eljaras)) continue;
+      if (t.feltetel && !u.jell[t.feltetel]) continue;
+      if (t.kiveve && u.jell[t.kiveve]) continue;
+      // A szabály „hatarido” mezője szöveg; a kiszámolt dátum ugyanide kerül, ezért előbb átmentjük.
+      const o = Object.assign({}, t, { kulcs: t.id, hataridoSz: t.hatarido, hatarido: null });
+      o.leiras = behelyettesit(t.leiras, u);
+      o.felelosSz = felelosSzoveg(t.felelos, u.eljaras);
+      o.megjegyzes = [];
+      if (t.alap) {
+        o.hatarido = d[t.alap] ? H.szamol(d[t.alap], t.szabaly, !!t.nav) : null;
+        if (!o.hatarido && t.tipus !== "info") o.fugg = S.ALAPOK[t.alap].cim;
+        if (t.id === "B8" && d._atteres150 && o.hatarido) o.megjegyzes.push("Áttérési ok megadása nélkül a 150. nappal számolva (Ctv. 115/A. § (1) c)).");
+        if (t.id === "A1.3" && u.datumok.kezdonap) {
+          const legkorabb = [H.napHozzaad(u.datumok.kezdonap, -30), u.datumok.dontes].filter(Boolean).sort().pop();
+          o.megjegyzes.push(`Legkorábban beadható: ${H.magyarDatum(legkorabb)}`);
+        }
+      }
+      lista.push(o);
+    }
+    // Évközi beszámolók (Kr. 5. § (6)) – általános eljárás, ha 12 hónapon túl elhúzódhat
+    if (u.eljaras === "alt" && u.jell.tobbEv && H.parse(d.kezdonap)) {
+      const hatar = d.zaroFordulo || H.evHozzaad(d.kezdonap, 3);
+      for (let k = 1; k <= 3; k++) {
+        const fordulo = H.napHozzaad(H.honapHozzaad(d.kezdonap, 12 * k), -1);
+        if (fordulo >= hatar) break;
+        const e = S.EVKOZI;
+        lista.push(Object.assign({}, e, {
+          kulcs: `${e.id}-${k}`, id: e.id, cim: e.cim.replace("{{fordulo}}", H.magyarDatum(fordulo)),
+          felelosSz: e.felelos, megjegyzes: [], hataridoSz: e.hatarido,
+          hatarido: H.szamol(fordulo, e.szabaly, false)
+        }));
+      }
+    }
+    for (const t of lista) {
+      t.allapot = allapot(t, u);
+      if (t.hatarido) {
+        if (t.hatarido.eltolva) t.megjegyzes.push(`A naptár szerinti utolsó nap (${H.magyarDatum(t.hatarido.eredeti)}) ${H.nemMunkanapOka(t.hatarido.eredeti)}, ezért a határidő a következő munkanapon jár le (Air. 52. § (4)).`);
+        else if (t.hatarido.nemMunkanap && t.tipus === "hatarido") t.megjegyzes.push(`Ez a nap ${t.hatarido.nemMunkanap}. Ezt a határidőt a segédlet nem tolja el – érdemes korábban teljesíteni.`);
+      }
+    }
+    return lista;
+  }
+
+  function figyelmeztetesek(u, lista) {
+    const f = [], d = u.datumok;
+    if (!d.kezdonap) f.push({ szint: "info", cim: "Add meg a kezdőnapot", szoveg: "A határidők többsége a végelszámolás kezdőnapjából számítódik." });
+    if (d.dontes && d.kezdonap && d.kezdonap < d.dontes)
+      f.push({ szint: "hiba", cim: "A kezdőnap korábbi a határozatnál", szoveg: "A kezdő időpont nem lehet korábbi, mint a határozat kelte (Ctv. 97. § (2))." });
+    if (u.eljaras === "egy" && u.jell.konyvvizsgalat)
+      f.push({ szint: "hiba", cim: "Egyszerűsített végelszámolás nem választható", szoveg: "Csak könyvvizsgálatra nem kötelezett cég végelszámolása lehet egyszerűsített (Ctv. 114. § (1) a))." });
+    if (d.kezdonap && d.zaroFordulo && d.zaroFordulo < d.kezdonap)
+      f.push({ szint: "hiba", cim: "A záró fordulónap korábbi a kezdőnapnál", szoveg: "Ellenőrizd a dátumokat." });
+    if (d.kozzetetel && d.kezdonap && d.kozzetetel < d.kezdonap && u.eljaras === "alt")
+      f.push({ szint: "info", cim: "A közzététel a kezdőnap előtt van", szoveg: "Ez lehetséges, ha a kérelmet a kezdőnap előtt adták be (Ctv. 50. § (6)); érdemes ellenőrizni a dátumot." });
+    if (u.eljaras === "alt" && d.kezdonap && d.zaroFordulo) {
+      const harom = H.evHozzaad(d.kezdonap, 3), utolso = H.napHozzaad(d.zaroFordulo, 60);
+      if (utolso > harom) f.push({ szint: "hiba", cim: "A 3 éves határ veszélyben", szoveg: `A záró fordulónap + 60 nap később van, mint a 3 éves határ (${H.magyarDatum(harom)}). Ha a törlési kérelem addig nem érkezik be, kényszertörlés indul (Ctv. 105. §).` });
+    }
+    if (u.eljaras === "egy" && d.kezdonap) {
+      const h150 = H.napHozzaad(d.kezdonap, 150);
+      if (d.zaroFordulo && d.zaroFordulo > h150)
+        f.push({ szint: "hiba", cim: "A záró fordulónap a 150. nap után van", szoveg: "Az egyszerűsített végelszámolást a kezdőnaptól számított 150 napon belül be kell fejezni (Ctv. 114. § (1) b)); különben át kell térni az általános eljárásra." });
+      if (MA > h150 && !u.kesz["B6"])
+        f.push({ szint: "hiba", cim: "Letelt a 150 nap", szoveg: `Ha a befejezés bejelentése nem történt meg, 60 napon belül át kell térni az általános eljárásra (Ctv. 115/A. §), különben a cégbíróság a 211. napon (${H.magyarDatum(H.napHozzaad(d.kezdonap, 211))}) lezárja az eljárást.` });
+    }
+    const hianyzoEvek = [...new Set(lista.filter((t) => t.hatarido && t.hatarido.munkarendHianyzik).map((t) => H.parse(t.hatarido.datum).getUTCFullYear()))].sort();
+    if (hianyzoEvek.length)
+      f.push({ szint: "info", cim: `Nincs kihirdetett munkarend: ${hianyzoEvek.join(", ")}`, szoveg: "Ezekre az évekre a segédlet csak a törvényi munkaszüneti napokkal (Mt. 102. § (1)) számol; az áthelyezett munka- és pihenőnapokat még nem ismeri." });
+    return f;
+  }
+
+  /* ---------- Megjelenítés ---------- */
+  function datumMezok() {
+    const u = ugy();
+    $("#datummezok").innerHTML = DATUMMEZOK.filter((m) => m.eljaras.includes(u.eljaras)).map((m) => `
+      <label class="cimke" for="d-${m.k}">${esc(m.cim)}</label>
+      <input class="mezo" type="date" id="d-${m.k}" data-datum="${m.k}" value="${esc(u.datumok[m.k] || "")}">
+      ${m.sugo ? `<span class="sugo">${esc(m.sugo)}</span>` : ""}`).join("");
+    $("#jellemzomezok").innerHTML = Object.entries(S.JELLEMZOK).map(([k, cim]) => {
+      // Egyszerűsített eljárásban nincs végelszámoló és nincs évközi beszámoló
+      const rejtett = u.eljaras === "egy" && ["tobbEv", "azonos", "meghatalmazas"].includes(k);
+      return rejtett ? "" : `<label><input type="checkbox" data-jell="${k}" ${u.jell[k] ? "checked" : ""}> <span>${esc(cim)}</span></label>`;
+    }).join("");
+  }
+
+  function urlapKitolt() {
+    const u = ugy();
+    $("#ceg").value = u.ceg;
+    document.querySelectorAll('input[name="eljaras"]').forEach((r) => { r.checked = r.value === u.eljaras; });
+    datumMezok();
+    $("#ugy").innerHTML = Object.values(ugyek)
+      .sort((a, b) => (a.ceg || "").localeCompare(b.ceg || "", "hu"))
+      .map((x) => `<option value="${esc(x.id)}" ${x.id === aktivId ? "selected" : ""}>${esc(x.ceg || "(névtelen ügy)")}</option>`).join("");
+    $("#keszRejt").checked = nezet.keszRejt;
+    $("#infoRejt").checked = nezet.infoRejt;
+  }
+
+  const JELVENY = {
+    lejart:  ["Lejárt", "jelveny--teli"],
+    kozeli:  ["Hamarosan", ""],
+    kesobbi: ["", ""],
+    mult:    ["Megtörtént", "jelveny--halvany"],
+    fugg:    ["Dátum kell", "jelveny--halvany"],
+    info:    ["Tudnivaló", "jelveny--halvany"],
+    kesz:    ["Kész", "jelveny--halvany"]
+  };
+
+  function hatraLevo(t) {
+    if (!t.hatarido) return "";
+    const k = H.napKulonbseg(MA, t.hatarido.datum);
+    if (k === 0) return "ma";
+    if (k > 0) return `${k} nap múlva`;
+    return `${-k} napja`;
+  }
+
+  function kartya(t, u) {
+    const [jSz, jOszt] = JELVENY[t.allapot];
+    const forr = t.forras.map(([f, hely]) => {
+      const F = S.FORRASOK[f];
+      return `<a href="${esc(F.url)}" target="_blank" rel="noopener" title="${esc(F.nev)}">${esc(F.rov)} ${esc(hely)}</a>`;
+    }).join("");
+    const datumBlokk = t.hatarido
+      ? `<span class="datum__nap">${esc(H.magyarDatum(t.hatarido.datum))}</span>
+         <span class="datum__het">${esc(H.magyarDatum(t.hatarido.datum, true).split("(")[1].replace(")", ""))} · ${esc(hatraLevo(t))}</span>`
+      : (t.fugg ? `<span class="datum__het">függ: ${esc(t.fugg.charAt(0).toLowerCase() + t.fugg.slice(1))}</span>` : "");
+    const megj = t.megjegyzes.map((m) => `<p class="kartya__megj">${esc(m)}</p>`).join("");
+    const jegyzet = u.jegyzet[t.kulcs] || "";
+    return `
+      <article class="kartya kartya--${t.allapot}" id="t-${esc(t.kulcs)}">
+        <div class="datum">
+          ${datumBlokk}
+          ${jSz ? `<span class="jelveny ${jOszt}">${esc(jSz)}</span>` : ""}
+        </div>
+        <div>
+          <div class="kartya__fej">
+            <h3>${esc(t.cim)}</h3>
+            ${t.tipus !== "info" ? `<label class="kesz"><input type="checkbox" data-kesz="${esc(t.kulcs)}" ${u.kesz[t.kulcs] ? "checked" : ""}> Kész</label>` : ""}
+          </div>
+          <p class="kartya__meta"><b>Határidő:</b> ${esc(t.hataridoSz)} · <b>Felelős:</b> ${esc(t.felelosSz)}</p>
+          <p class="kartya__leiras">${esc(t.leiras)}</p>
+          ${megj}
+          <div class="forrasok">${forr}</div>
+          <details class="jegyzet" ${jegyzet ? "open" : ""}>
+            <summary>Jegyzet</summary>
+            <textarea data-jegyzet="${esc(t.kulcs)}" aria-label="Jegyzet: ${esc(t.cim)}">${esc(jegyzet)}</textarea>
+          </details>
+        </div>
+      </article>`;
+  }
+
+  function rajzol() {
+    const u = ugy();
+    const lista = tetelek(u);
+
+    $("#figyelmeztetesek").innerHTML = figyelmeztetesek(u, lista).map((f) =>
+      `<div class="figy figy--${f.szint}" role="${f.szint === "hiba" ? "alert" : "status"}"><strong>${esc(f.cim)}</strong><p>${esc(f.szoveg)}</p></div>`).join("");
+
+    // Összesítő
+    const datumos = lista.filter((t) => t.hatarido && t.tipus === "hatarido");
+    const lejart = datumos.filter((t) => t.allapot === "lejart");
+    const kozeli = datumos.filter((t) => t.allapot === "kozeli");
+    const kov = datumos.filter((t) => ["lejart", "kozeli", "kesobbi"].includes(t.allapot))
+      .sort((a, b) => a.hatarido.datum.localeCompare(b.hatarido.datum)).slice(0, 4);
+    const nyitott = lista.filter((t) => t.tipus !== "info" && !u.kesz[t.kulcs]).length;
+    $("#osszesito").innerHTML = `
+      <div class="osszesito">
+        <h2>${esc(u.ceg || "Névtelen ügy")} – ${u.eljaras === "egy" ? "egyszerűsített" : "általános"} végelszámolás</h2>
+        <div class="osszesito__szamok">
+          <span><b>${lejart.length}</b> lejárt határidő</span>
+          <span><b>${kozeli.length}</b> esedékes ${KOZELI_NAP} napon belül</span>
+          <span><b>${nyitott}</b> nyitott teendő</span>
+        </div>
+        ${kov.length ? `<ol>${kov.map((t) => `<li><span>${esc(H.magyarDatum(t.hatarido.datum))}</span><a href="#t-${esc(t.kulcs)}">${esc(t.cim)}</a></li>`).join("")}</ol>`
+          : `<p class="ures">${u.datumok.kezdonap ? "Nincs nyitott, dátummal rendelkező határidő." : "A kezdőnap megadása után itt jelennek meg a következő határidők."}</p>`}
+      </div>`;
+    $("#nyomtatasfej").innerHTML = `<p>Nyomtatva: ${esc(H.magyarDatum(MA))}${u.datumok.kezdonap ? " · Kezdőnap: " + esc(H.magyarDatum(u.datumok.kezdonap)) : ""}</p>`;
+
+    // Ütemterv szakaszonként
+    let html = "";
+    for (const sz of S.SZAKASZOK) {
+      let t = lista.filter((x) => x.szakasz === sz.kulcs);
+      if (nezet.keszRejt) t = t.filter((x) => x.allapot !== "kesz");
+      if (nezet.infoRejt) t = t.filter((x) => x.hatarido);
+      if (!t.length) continue;
+      t.sort((a, b) => {
+        const da = a.hatarido ? a.hatarido.datum : "9999", db = b.hatarido ? b.hatarido.datum : "9999";
+        return da.localeCompare(db);
+      });
+      html += `<section class="szakasz"><h2>${esc(sz.cim)}</h2>${t.map((x) => kartya(x, u)).join("")}</section>`;
+    }
+    $("#utemterv").innerHTML = html || `<div class="ures-allapot"><p>Nincs megjeleníthető tétel a szűrők mellett.</p></div>`;
+  }
+
+  function lablec() {
+    $("#forraslista").innerHTML = Object.values(S.FORRASOK).map((f) =>
+      `<li><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.rov)}</a> – ${esc(f.nev)}</li>`).join("");
+    $("#munkarendek").innerHTML = Object.entries(H.MUNKAREND).map(([ev, m]) =>
+      `${esc(ev)}: <a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.forras)}</a>`).join("; ");
+    $("#allapot").textContent = H.magyarDatum(S.ALLAPOT);
+  }
+
+  /* ---------- Export ---------- */
+  function letolt(nev, tartalom, tipus) {
+    const blob = new Blob([tartalom], { type: tipus });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nev;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+  function fajlnev(u, kit) {
+    const alap = (u.ceg || "ugy").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "ugy";
+    return `vegelszamolas-${alap}.${kit}`;
+  }
+
+  function icsEsc(s) {
+    return String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  }
+  // RFC 5545: egy sor legfeljebb 75 oktett; a folytatósor szóközzel kezdődik.
+  // Bájtra számolunk (az ékezetes betű UTF-8-ban 2 bájt), és karakter közepén nem vágunk.
+  const kodolo = new TextEncoder();
+  function icsHajt(sor) {
+    const ki = [];
+    let akt = "", bajt = 0, keret = 75;
+    for (const c of sor) {
+      const b = kodolo.encode(c).length;
+      if (bajt + b > keret) { ki.push(akt); akt = " "; bajt = 1; keret = 75; }
+      akt += c; bajt += b;
+    }
+    ki.push(akt);
+    return ki.join("\r\n");
+  }
+
+  function icsExport() {
+    const u = ugy(), szoveg = icsSzoveg(u);
+    if (!szoveg) { alert("Nincs naptárba tehető határidő. Add meg a kezdőnapot és a többi ismert dátumot."); return; }
+    letolt(fajlnev(u, "ics"), szoveg, "text/calendar;charset=utf-8");
+  }
+
+  // Csak a még nem kész, dátummal rendelkező határidők és események
+  function icsSzoveg(u) {
+    const lista = tetelek(u).filter((t) => t.hatarido && t.tipus !== "info" && t.allapot !== "kesz");
+    if (!lista.length) return "";
+    const most = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+    const sorok = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//vegelszamolas-segedlet//HU", "CALSCALE:GREGORIAN"];
+    for (const t of lista) {
+      const d = t.hatarido.datum.replace(/-/g, "");
+      const kov = H.napHozzaad(t.hatarido.datum, 1).replace(/-/g, "");
+      const forr = t.forras.map(([f, h]) => `${S.FORRASOK[f].rov} ${h}`).join("; ");
+      sorok.push("BEGIN:VEVENT",
+        `UID:${u.id}-${t.kulcs}@vegelszamolas-segedlet`,
+        `DTSTAMP:${most}`,
+        `DTSTART;VALUE=DATE:${d}`,
+        `DTEND;VALUE=DATE:${kov}`,
+        icsHajt(`SUMMARY:${icsEsc(`${u.ceg ? u.ceg + ": " : ""}${t.cim}`)}`),
+        icsHajt(`DESCRIPTION:${icsEsc(`Határidő: ${t.hataridoSz}\nFelelős: ${t.felelosSz}\n\n${t.leiras}\n\nForrás: ${forr}`)}`));
+      if (t.tipus === "hatarido") sorok.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Közeledő határidő", "TRIGGER:-P5D", "END:VALARM");
+      sorok.push("END:VEVENT");
+    }
+    sorok.push("END:VCALENDAR");
+    return sorok.join("\r\n") + "\r\n";
+  }
+
+  /* ---------- Események ---------- */
+  function frissit() { ment(); rajzol(); }
+
+  document.addEventListener("input", (e) => {
+    const el = e.target;
+    if (el.id === "ceg") { ugy().ceg = el.value; ment(); rajzol(); urlapKitoltUgylista(); return; }
+    if (el.dataset.jegyzet) { const u = ugy(); if (el.value) u.jegyzet[el.dataset.jegyzet] = el.value; else delete u.jegyzet[el.dataset.jegyzet]; ment(); }
+  });
+
+  function urlapKitoltUgylista() {
+    const opt = $(`#ugy option[value="${CSS.escape(aktivId)}"]`);
+    if (opt) opt.textContent = ugy().ceg || "(névtelen ügy)";
+  }
+
+  document.addEventListener("change", (e) => {
+    const el = e.target, u = ugy();
+    if (el.name === "eljaras") { u.eljaras = el.value; datumMezok(); frissit(); }
+    else if (el.dataset.datum) {
+      if (H.parse(el.value)) u.datumok[el.dataset.datum] = el.value; else delete u.datumok[el.dataset.datum];
+      frissit();
+    }
+    else if (el.dataset.jell) { if (el.checked) u.jell[el.dataset.jell] = true; else delete u.jell[el.dataset.jell]; frissit(); }
+    else if (el.dataset.kesz) { if (el.checked) u.kesz[el.dataset.kesz] = true; else delete u.kesz[el.dataset.kesz]; frissit(); }
+    else if (el.id === "ugy") { aktivId = el.value; ir(AKTIV, aktivId); urlapKitolt(); rajzol(); }
+    else if (el.id === "keszRejt" || el.id === "infoRejt") { nezet[el.id] = el.checked; ir(NEZET, nezet); rajzol(); }
+    else if (el.id === "betolt" && el.files[0]) {
+      const r = new FileReader();
+      r.onload = () => {
+        let adat = null;
+        try { adat = ervenyesit(JSON.parse(r.result)); } catch (err) { adat = null; }
+        if (!adat) { alert("A fájl nem a segédlet mentése, vagy sérült."); return; }
+        if (ugyek[adat.id] && !confirm(`Ez az ügy („${adat.ceg || "névtelen"}”) már szerepel. Felülírod a fájlban lévő változattal?`)) return;
+        ugyek[adat.id] = adat; aktivId = adat.id; ment(); urlapKitolt(); rajzol();
+      };
+      r.readAsText(el.files[0]);
+      el.value = "";
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-muvelet]");
+    if (!b) return;
+    const m = b.dataset.muvelet;
+    if (m === "uj") { const u = uresUgy(); ugyek[u.id] = u; aktivId = u.id; ment(); urlapKitolt(); rajzol(); $("#ceg").focus(); }
+    if (m === "torol") {
+      if (!confirm(`Törlöd ezt az ügyet („${ugy().ceg || "névtelen"}”) ebből a böngészőből? Fájlba mentett példányt ez nem érint.`)) return;
+      delete ugyek[aktivId];
+      const elso = Object.keys(ugyek)[0];
+      if (elso) aktivId = elso; else { const u = uresUgy(); ugyek[u.id] = u; aktivId = u.id; }
+      ment(); urlapKitolt(); rajzol();
+    }
+    if (m === "ment") letolt(fajlnev(ugy(), "json"), JSON.stringify(ugy(), null, 2), "application/json");
+    if (m === "ics") icsExport();
+    if (m === "nyomtat") window.print();
+  });
+
+  // Tesztekhez
+  window.VegelszamolasApp = { tetelek, figyelmeztetesek, ervenyesit, icsSzoveg, MA };
+
+  lablec();
+  urlapKitolt();
+  rajzol();
+})();
+
+</script>
+</body>
+</html>
